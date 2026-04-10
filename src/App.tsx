@@ -60,6 +60,7 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [scanText, setScanText] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<SafetyAnalysis | null>(null);
@@ -326,6 +327,18 @@ export default function App() {
     }
   };
 
+  const handleTabChange = (tab: string) => {
+    const restrictedTabs = ["scanner", "footprint", "quest", "chat", "emergency"];
+    if (restrictedTabs.includes(tab) && !user) {
+      setShowAuthModal(true);
+      toast.info("Sign in required", {
+        description: "Please sign in to use this feature."
+      });
+    } else {
+      setActiveTab(tab);
+    }
+  };
+
   if (isAuthLoading) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
@@ -450,32 +463,35 @@ export default function App() {
             <span className="text-xl font-bold tracking-tight text-slate-900">SafeGuard <span className="text-indigo-600">AI</span></span>
           </div>
           <nav className="hidden md:flex items-center gap-6">
-            <button onClick={() => setActiveTab("dashboard")} className={`text-sm font-medium transition-colors ${activeTab === "dashboard" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Dashboard</button>
-            <button onClick={() => setActiveTab("scanner")} className={`text-sm font-medium transition-colors ${activeTab === "scanner" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Scanner</button>
-            <button onClick={() => setActiveTab("footprint")} className={`text-sm font-medium transition-colors ${activeTab === "footprint" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Footprint</button>
-            <button onClick={() => setActiveTab("quest")} className={`text-sm font-medium transition-colors ${activeTab === "quest" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Quest</button>
-            <button onClick={() => setActiveTab("resources")} className={`text-sm font-medium transition-colors ${activeTab === "resources" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Resources</button>
-            <button onClick={() => setActiveTab("chat")} className={`text-sm font-medium transition-colors ${activeTab === "chat" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Chat</button>
-            <button onClick={() => setActiveTab("emergency")} className={`text-sm font-medium transition-colors ${activeTab === "emergency" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Emergency</button>
+            <button onClick={() => handleTabChange("dashboard")} className={`text-sm font-medium transition-colors ${activeTab === "dashboard" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Dashboard</button>
+            <button onClick={() => handleTabChange("scanner")} className={`text-sm font-medium transition-colors ${activeTab === "scanner" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Scanner</button>
+            <button onClick={() => handleTabChange("footprint")} className={`text-sm font-medium transition-colors ${activeTab === "footprint" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Footprint</button>
+            <button onClick={() => handleTabChange("quest")} className={`text-sm font-medium transition-colors ${activeTab === "quest" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Quest</button>
+            <button onClick={() => handleTabChange("resources")} className={`text-sm font-medium transition-colors ${activeTab === "resources" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Resources</button>
+            <button onClick={() => handleTabChange("chat")} className={`text-sm font-medium transition-colors ${activeTab === "chat" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Chat</button>
+            <button onClick={() => handleTabChange("emergency")} className={`text-sm font-medium transition-colors ${activeTab === "emergency" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Emergency</button>
           </nav>
           <div className="flex items-center gap-3">
-            <motion.div 
-              animate={{ y: [0, -5, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 px-3 py-1 flex items-center gap-2">
-                <Shield className="w-3 h-3" />
-                Safety Score: {safetyScore}%
-              </Badge>
-            </motion.div>
-            <Avatar className="w-8 h-8 border">
-              <AvatarImage src={user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`} />
-              <AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-slate-500 gap-2">
-              <LogOut className="w-4 h-4" />
-              Logout
-            </Button>
+            {user ? (
+              <>
+                <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 px-3 py-1 flex items-center gap-2">
+                  <Shield className="w-3 h-3" />
+                  Safety Score: {safetyScore}%
+                </Badge>
+                <Avatar className="w-8 h-8 border">
+                  <AvatarImage src={user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`} />
+                  <AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <Button variant="ghost" size="sm" onClick={handleLogout} className="text-slate-500 gap-2">
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" onClick={() => setShowAuthModal(true)} className="bg-indigo-600 hover:bg-indigo-700">
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -485,20 +501,16 @@ export default function App() {
           {activeTab === "dashboard" && (
             <motion.div
               key="dashboard"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="space-y-8"
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="md:col-span-2 border-none shadow-sm bg-indigo-600 text-white overflow-hidden relative">
-                  <motion.div 
-                    className="absolute top-0 right-0 p-8 opacity-10"
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                  >
+                  <div className="absolute top-0 right-0 p-8 opacity-10">
                     <Shield className="w-48 h-48" />
-                  </motion.div>
+                  </div>
                   <CardHeader>
                     <CardTitle className="text-2xl font-bold">Welcome</CardTitle>
                     <CardDescription className="text-indigo-100 text-lg">
@@ -507,10 +519,10 @@ export default function App() {
                   </CardHeader>
                   <CardContent className="pb-8">
                     <div className="flex items-center gap-4">
-                      <Button variant="secondary" onClick={() => setActiveTab("scanner")} className="bg-white text-indigo-600 hover:bg-indigo-50">
+                      <Button variant="secondary" onClick={() => handleTabChange("scanner")} className="bg-white text-indigo-600 hover:bg-indigo-50">
                         Scan New Content
                       </Button>
-                      <Button variant="outline" onClick={() => setActiveTab("chat")} className="border-white/30 text-white hover:bg-white/10">
+                      <Button variant="outline" onClick={() => handleTabChange("chat")} className="border-white/30 text-white hover:bg-white/10">
                         Talk to SafeGuard
                       </Button>
                     </div>
@@ -528,19 +540,9 @@ export default function App() {
                   <CardContent className="relative space-y-4">
                     <div className="flex flex-wrap gap-2">
                       {achievements.length > 0 ? achievements.map((ach, i) => (
-                        <motion.div
-                          key={i}
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1, y: [0, -5, 0] }}
-                          transition={{ 
-                            scale: { type: "spring", damping: 12 },
-                            y: { duration: 3 + Math.random() * 2, repeat: Infinity, ease: "easeInOut" }
-                          }}
-                        >
-                          <Badge className="bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200">
-                            {ach}
-                          </Badge>
-                        </motion.div>
+                        <Badge key={i} className="bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200">
+                          {ach}
+                        </Badge>
                       )) : (
                         <p className="text-xs text-slate-400 italic">Complete tasks to unlock badges.</p>
                       )}
@@ -584,9 +586,9 @@ export default function App() {
           {activeTab === "scanner" && (
             <motion.div
               key="scanner"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="max-w-3xl mx-auto space-y-6"
             >
               <div className="text-center space-y-2">
@@ -726,9 +728,9 @@ export default function App() {
           {activeTab === "footprint" && (
             <motion.div
               key="footprint"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="max-w-4xl mx-auto space-y-6"
             >
               <div className="text-center space-y-2">
@@ -795,9 +797,9 @@ export default function App() {
           {activeTab === "quest" && (
             <motion.div
               key="quest"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="max-w-2xl mx-auto"
             >
               {quizQuestions.length === 0 ? (
@@ -904,9 +906,9 @@ export default function App() {
           {activeTab === "resources" && (
             <motion.div
               key="resources"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="max-w-5xl mx-auto space-y-8"
             >
               <div className="text-center space-y-2">
@@ -1013,13 +1015,9 @@ export default function App() {
               </div>
 
               <Card className="border-none shadow-sm bg-slate-900 text-white overflow-hidden relative">
-                <motion.div 
-                  className="absolute -right-12 -bottom-12 opacity-10"
-                  animate={{ scale: [1, 1.1, 1] }}
-                  transition={{ duration: 10, repeat: Infinity }}
-                >
+                <div className="absolute -right-12 -bottom-12 opacity-10">
                   <Users className="w-64 h-64" />
-                </motion.div>
+                </div>
                 <CardHeader>
                   <CardTitle>Community Support</CardTitle>
                   <CardDescription className="text-slate-400">You are not alone. There are millions of people and organizations ready to help.</CardDescription>
@@ -1036,9 +1034,9 @@ export default function App() {
           {activeTab === "chat" && (
             <motion.div
               key="chat"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="max-w-4xl mx-auto h-[calc(100vh-12rem)] flex flex-col"
             >
               <Card className="flex-1 flex flex-col border-none shadow-xl overflow-hidden">
@@ -1125,9 +1123,9 @@ export default function App() {
           {activeTab === "emergency" && (
             <motion.div
               key="emergency"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="max-w-4xl mx-auto space-y-8"
             >
               <div className="text-center space-y-2">
@@ -1229,6 +1227,122 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Auth Modal Overlay */}
+      <AnimatePresence>
+        {showAuthModal && !user && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-md relative"
+            >
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute right-2 top-2 z-10 text-slate-400 hover:text-slate-600"
+                onClick={() => setShowAuthModal(false)}
+              >
+                <XCircle className="w-6 h-6" />
+              </Button>
+              <Card className="border-none shadow-2xl">
+                <CardHeader className="text-center space-y-2">
+                  <div className="mx-auto bg-indigo-600 p-3 rounded-2xl w-fit">
+                    <Shield className="w-8 h-8 text-white" />
+                  </div>
+                  <CardTitle className="text-2xl font-bold">SafeGuard AI</CardTitle>
+                  <CardDescription>
+                    {isSignUp ? "Create an account to get started" : "Sign in to access your safety companion"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <form onSubmit={handleEmailLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">Email Address</label>
+                      <Input 
+                        type="email" 
+                        placeholder="name@example.com" 
+                        value={loginEmail}
+                        onChange={(e) => setLoginEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700">Password</label>
+                      <Input 
+                        type="password" 
+                        placeholder="••••••••" 
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 h-11">
+                      {isSignUp ? "Sign Up" : "Sign In"}
+                    </Button>
+                  </form>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white px-2 text-slate-500">Or continue with</span>
+                    </div>
+                  </div>
+
+                  <Button 
+                    variant="outline" 
+                    className="w-full h-11 gap-2" 
+                    onClick={handleGoogleLogin}
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                      <path
+                        fill="currentColor"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="currentColor"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="currentColor"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+                      />
+                      <path
+                        fill="currentColor"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                      />
+                    </svg>
+                    Google
+                  </Button>
+                </CardContent>
+                <CardFooter className="flex flex-col gap-4">
+                  <p className="text-sm text-center text-slate-600">
+                    {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+                    <button 
+                      onClick={() => setIsSignUp(!isSignUp)}
+                      className="text-indigo-600 font-semibold hover:underline"
+                    >
+                      {isSignUp ? "Sign In" : "Sign Up"}
+                    </button>
+                  </p>
+                  <Separator />
+                  <p className="text-xs text-center text-slate-500">
+                    By continuing, you agree to our Terms of Service and Privacy Policy.
+                  </p>
+                </CardFooter>
+              </Card>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

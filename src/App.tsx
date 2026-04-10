@@ -20,11 +20,7 @@ import {
   Globe,
   Gamepad2,
   Fingerprint,
-  Trophy,
-  LogOut,
-  BookOpen,
-  ExternalLink,
-  Users
+  Trophy
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,8 +33,6 @@ import { Separator } from "@/components/ui/separator";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { analyzeContent, getSupportResponse, analyzeImage, scanPrivacyExposure, generateSafetyQuiz, SafetyAnalysis, PrivacyLeak, QuizQuestion } from "@/src/lib/gemini";
-import { auth, signOut, onAuthStateChanged, User, db, doc, setDoc, updateDoc, increment, onSnapshot, serverTimestamp } from "@/src/lib/firebase";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 
 // --- Types ---
 interface Message {
@@ -51,13 +45,9 @@ interface Message {
 // --- Components ---
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [safetyScore, setSafetyScore] = useState(0);
-  const [achievements, setAchievements] = useState<string[]>([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
   
   const [activeTab, setActiveTab] = useState("dashboard");
   const [scanText, setScanText] = useState("");
@@ -91,85 +81,22 @@ export default function App() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        // Sync safety score from Firestore
-        const userDocRef = doc(db, "users", currentUser.uid);
-        const unsubDoc = onSnapshot(userDocRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setSafetyScore(data.safetyScore || 0);
-            setAchievements(data.achievements || []);
-          } else {
-            // Initialize user doc if it doesn't exist
-            setDoc(userDocRef, {
-              uid: currentUser.uid,
-              email: currentUser.email,
-              displayName: currentUser.displayName,
-              photoURL: currentUser.photoURL,
-              safetyScore: 0,
-              achievements: [],
-              createdAt: serverTimestamp()
-            });
-          }
-        });
-        return () => unsubDoc();
-      }
-      setIsAuthLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const updateSafetyScore = async (points: number, achievement?: string) => {
-    if (!user) return;
-    const userDocRef = doc(db, "users", user.uid);
-    try {
-      const updateData: any = {
-        safetyScore: increment(points)
-      };
-      if (achievement && !achievements.includes(achievement)) {
-        updateData.achievements = [...achievements, achievement];
-        toast.success("New Achievement Unlocked!", {
-          description: achievement,
-          icon: <Trophy className="w-5 h-5 text-amber-500" />
-        });
-      }
-      await updateDoc(userDocRef, updateData);
-    } catch (error) {
-      console.error("Error updating safety score:", error);
-    }
-  };
-
-  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [chatMessages, isTyping]);
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, loginEmail, loginPassword);
-        toast.success("Account created!");
-      } else {
-        await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
-        toast.success("Welcome back!");
-      }
-    } catch (error: any) {
-      toast.error("Authentication failed", {
-        description: error.message
+    if (loginEmail && loginPassword) {
+      setIsLoggedIn(true);
+      toast.success("Welcome back!", {
+        description: "You have successfully logged in."
       });
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      toast.success("Logged out successfully");
-    } catch (error) {
-      toast.error("Logout failed");
+    } else {
+      toast.error("Login failed", {
+        description: "Please enter both email and password."
+      });
     }
   };
 
@@ -207,7 +134,6 @@ export default function App() {
         toast.success("Content looks safe", {
           description: "No immediate threats detected."
         });
-        updateSafetyScore(5, "Content Guardian");
       }
     } catch (error) {
       toast.error("Analysis failed", {
@@ -307,27 +233,10 @@ export default function App() {
       setQuizAnswered(null);
     } else {
       setShowQuizResult(true);
-      if (quizScore === quizQuestions.length) {
-        updateSafetyScore(20, "Safety Expert");
-      } else {
-        updateSafetyScore(10);
-      }
     }
   };
 
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-  };
-
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
+  if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4">
         <Toaster position="top-center" />
@@ -342,12 +251,10 @@ export default function App() {
                 <Shield className="w-8 h-8 text-white" />
               </div>
               <CardTitle className="text-2xl font-bold">SafeGuard AI</CardTitle>
-              <CardDescription>
-                {isSignUp ? "Create an account to get started" : "Sign in to access your safety companion"}
-              </CardDescription>
+              <CardDescription>Authorize to access your safety companion</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <form onSubmit={handleEmailLogin} className="space-y-4">
+            <CardContent>
+              <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-700">Email Address</label>
                   <Input 
@@ -369,23 +276,14 @@ export default function App() {
                   />
                 </div>
                 <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 h-11">
-                  {isSignUp ? "Sign Up" : "Sign In"}
+                  Sign In
                 </Button>
               </form>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
-              <p className="text-sm text-center text-slate-600">
-                {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-                <button 
-                  onClick={() => setIsSignUp(!isSignUp)}
-                  className="text-indigo-600 font-semibold hover:underline"
-                >
-                  {isSignUp ? "Sign In" : "Sign Up"}
-                </button>
-              </p>
               <Separator />
               <p className="text-xs text-center text-slate-500">
-                By continuing, you agree to our Terms of Service and Privacy Policy.
+                By signing in, you agree to our Terms of Service and Privacy Policy.
               </p>
             </CardFooter>
           </Card>
@@ -408,27 +306,22 @@ export default function App() {
             <span className="text-xl font-bold tracking-tight text-slate-900">SafeGuard <span className="text-indigo-600">AI</span></span>
           </div>
           <nav className="hidden md:flex items-center gap-6">
-            <button onClick={() => handleTabChange("dashboard")} className={`text-sm font-medium transition-colors ${activeTab === "dashboard" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Dashboard</button>
-            <button onClick={() => handleTabChange("scanner")} className={`text-sm font-medium transition-colors ${activeTab === "scanner" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Scanner</button>
-            <button onClick={() => handleTabChange("footprint")} className={`text-sm font-medium transition-colors ${activeTab === "footprint" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Footprint</button>
-            <button onClick={() => handleTabChange("quest")} className={`text-sm font-medium transition-colors ${activeTab === "quest" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Quest</button>
-            <button onClick={() => handleTabChange("resources")} className={`text-sm font-medium transition-colors ${activeTab === "resources" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Resources</button>
-            <button onClick={() => handleTabChange("chat")} className={`text-sm font-medium transition-colors ${activeTab === "chat" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Chat</button>
-            <button onClick={() => handleTabChange("emergency")} className={`text-sm font-medium transition-colors ${activeTab === "emergency" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Emergency</button>
+            <button onClick={() => setActiveTab("dashboard")} className={`text-sm font-medium transition-colors ${activeTab === "dashboard" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Dashboard</button>
+            <button onClick={() => setActiveTab("scanner")} className={`text-sm font-medium transition-colors ${activeTab === "scanner" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Scanner</button>
+            <button onClick={() => setActiveTab("footprint")} className={`text-sm font-medium transition-colors ${activeTab === "footprint" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Footprint</button>
+            <button onClick={() => setActiveTab("quest")} className={`text-sm font-medium transition-colors ${activeTab === "quest" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Quest</button>
+            <button onClick={() => setActiveTab("chat")} className={`text-sm font-medium transition-colors ${activeTab === "chat" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Chat</button>
+            <button onClick={() => setActiveTab("emergency")} className={`text-sm font-medium transition-colors ${activeTab === "emergency" ? "text-indigo-600" : "text-slate-500 hover:text-slate-900"}`}>Emergency</button>
           </nav>
           <div className="flex items-center gap-3">
-            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 px-3 py-1 flex items-center gap-2">
-              <Shield className="w-3 h-3" />
-              Safety Score: {safetyScore}%
+            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-100 px-3 py-1">
+              Safety Score: 85%
             </Badge>
             <Avatar className="w-8 h-8 border">
-              <AvatarImage src={user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`} />
-              <AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback>
+              <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=Ram" />
+              <AvatarFallback>U</AvatarFallback>
             </Avatar>
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-slate-500 gap-2">
-              <LogOut className="w-4 h-4" />
-              Logout
-            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setIsLoggedIn(false)} className="text-slate-500">Logout</Button>
           </div>
         </div>
       </header>
@@ -438,9 +331,9 @@ export default function App() {
           {activeTab === "dashboard" && (
             <motion.div
               key="dashboard"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
               className="space-y-8"
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -451,48 +344,41 @@ export default function App() {
                   <CardHeader>
                     <CardTitle className="text-2xl font-bold">Welcome</CardTitle>
                     <CardDescription className="text-indigo-100 text-lg">
-                      Your digital world is currently stable. Your safety score is {safetyScore}%.
+                      Your digital world is currently stable. We've monitored 12 interactions today.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pb-8">
                     <div className="flex items-center gap-4">
-                      <Button variant="secondary" onClick={() => handleTabChange("scanner")} className="bg-white text-indigo-600 hover:bg-indigo-50">
+                      <Button variant="secondary" onClick={() => setActiveTab("scanner")} className="bg-white text-indigo-600 hover:bg-indigo-50">
                         Scan New Content
                       </Button>
-                      <Button variant="outline" onClick={() => handleTabChange("chat")} className="border-white/30 text-white hover:bg-white/10">
+                      <Button variant="outline" onClick={() => setActiveTab("chat")} className="border-white/30 text-white hover:bg-white/10">
                         Talk to SafeGuard
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-white opacity-50" />
-                  <CardHeader className="relative">
+                <Card className="border-none shadow-sm">
+                  <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Trophy className="w-5 h-5 text-amber-500" />
-                      Safety Vault
+                      <AlertTriangle className="w-5 h-5 text-amber-500" />
+                      Recent Alerts
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="relative space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      {achievements.length > 0 ? achievements.map((ach, i) => (
-                        <Badge key={i} className="bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200">
-                          {ach}
-                        </Badge>
-                      )) : (
-                        <p className="text-xs text-slate-400 italic">Complete tasks to unlock badges.</p>
-                      )}
+                  <CardContent className="space-y-4">
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-100">
+                      <div className="mt-1"><Info className="w-4 h-4 text-amber-600" /></div>
+                      <div>
+                        <p className="text-sm font-medium text-amber-900">Unusual Login Attempt</p>
+                        <p className="text-xs text-amber-700">From Mumbai, India • 2h ago</p>
+                      </div>
                     </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <p className="text-xs font-bold text-slate-500 uppercase">Recent Activity</p>
-                      <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
-                        <div className="mt-1"><CheckCircle2 className="w-4 h-4 text-emerald-600" /></div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">Score Updated</p>
-                          <p className="text-xs text-slate-500">Your safety score is now {safetyScore}%.</p>
-                        </div>
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                      <div className="mt-1"><CheckCircle2 className="w-4 h-4 text-emerald-600" /></div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">Profile Scan Complete</p>
+                        <p className="text-xs text-slate-500">No fake accounts found using your photos.</p>
                       </div>
                     </div>
                   </CardContent>
@@ -523,9 +409,9 @@ export default function App() {
           {activeTab === "scanner" && (
             <motion.div
               key="scanner"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               className="max-w-3xl mx-auto space-y-6"
             >
               <div className="text-center space-y-2">
@@ -665,9 +551,9 @@ export default function App() {
           {activeTab === "footprint" && (
             <motion.div
               key="footprint"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               className="max-w-4xl mx-auto space-y-6"
             >
               <div className="text-center space-y-2">
@@ -734,9 +620,9 @@ export default function App() {
           {activeTab === "quest" && (
             <motion.div
               key="quest"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
               className="max-w-2xl mx-auto"
             >
               {quizQuestions.length === 0 ? (
@@ -840,140 +726,12 @@ export default function App() {
             </motion.div>
           )}
 
-          {activeTab === "resources" && (
-            <motion.div
-              key="resources"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="max-w-5xl mx-auto space-y-8"
-            >
-              <div className="text-center space-y-2">
-                <h2 className="text-3xl font-bold tracking-tight">Safety & Support Resources</h2>
-                <p className="text-slate-500 text-lg">Curated links to help you navigate the digital world safely and find support when you need it.</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Mental Health Support */}
-                <Card className="border-none shadow-lg hover:shadow-xl transition-all group">
-                  <CardHeader className="pb-4">
-                    <div className="bg-rose-100 p-3 rounded-2xl w-fit mb-2 group-hover:scale-110 transition-transform">
-                      <Heart className="w-6 h-6 text-rose-600" />
-                    </div>
-                    <CardTitle className="text-xl">Mental Health</CardTitle>
-                    <CardDescription>Professional support for your emotional well-being.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {[
-                      { name: "AASRA Helpline", desc: "24/7 suicide prevention & counseling", link: "http://www.aasra.info/" },
-                      { name: "iCall (TISS)", desc: "Psychosocial helpline by professionals", link: "https://icallhelpline.org/" },
-                      { name: "Vandrevala Foundation", desc: "Mental health support via chat/call", link: "https://www.vandrevalafoundation.com/" }
-                    ].map((res, i) => (
-                      <a 
-                        key={i} 
-                        href={res.link} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-rose-50 border border-slate-100 hover:border-rose-100 transition-all group/item"
-                      >
-                        <div>
-                          <p className="text-sm font-bold text-slate-900 group-hover/item:text-rose-700">{res.name}</p>
-                          <p className="text-[10px] text-slate-500">{res.desc}</p>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-slate-400 group-hover/item:text-rose-500" />
-                      </a>
-                    ))}
-                  </CardContent>
-                </Card>
-
-                {/* Cyberbullying Reporting */}
-                <Card className="border-none shadow-lg hover:shadow-xl transition-all group">
-                  <CardHeader className="pb-4">
-                    <div className="bg-amber-100 p-3 rounded-2xl w-fit mb-2 group-hover:scale-110 transition-transform">
-                      <AlertTriangle className="w-6 h-6 text-amber-600" />
-                    </div>
-                    <CardTitle className="text-xl">Reporting Hub</CardTitle>
-                    <CardDescription>Official channels to report online crimes and abuse.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {[
-                      { name: "CyberCrime.gov.in", desc: "National Cyber Crime Reporting Portal", link: "https://www.cybercrime.gov.in/" },
-                      { name: "Instagram Safety", desc: "Report bullying on Instagram", link: "https://help.instagram.com/547601325292351" },
-                      { name: "TikTok Safety Center", desc: "Reporting tools for TikTok", link: "https://www.tiktok.com/safety/en/reporting/" }
-                    ].map((res, i) => (
-                      <a 
-                        key={i} 
-                        href={res.link} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-amber-50 border border-slate-100 hover:border-amber-100 transition-all group/item"
-                      >
-                        <div>
-                          <p className="text-sm font-bold text-slate-900 group-hover/item:text-amber-700">{res.name}</p>
-                          <p className="text-[10px] text-slate-500">{res.desc}</p>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-slate-400 group-hover/item:text-amber-500" />
-                      </a>
-                    ))}
-                  </CardContent>
-                </Card>
-
-                {/* Online Safety Tips */}
-                <Card className="border-none shadow-lg hover:shadow-xl transition-all group">
-                  <CardHeader className="pb-4">
-                    <div className="bg-indigo-100 p-3 rounded-2xl w-fit mb-2 group-hover:scale-110 transition-transform">
-                      <BookOpen className="w-6 h-6 text-indigo-600" />
-                    </div>
-                    <CardTitle className="text-xl">Safety Tips</CardTitle>
-                    <CardDescription>Learn how to protect yourself and your data.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {[
-                      { name: "ConnectSafely", desc: "Guides for parents and teens", link: "https://www.connectsafely.org/" },
-                      { name: "StaySafeOnline", desc: "Cybersecurity awareness and tips", link: "https://staysafeonline.org/" },
-                      { name: "Google Safety Center", desc: "Tools for online security", link: "https://safety.google/" }
-                    ].map((res, i) => (
-                      <a 
-                        key={i} 
-                        href={res.link} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-100 transition-all group/item"
-                      >
-                        <div>
-                          <p className="text-sm font-bold text-slate-900 group-hover/item:text-indigo-700">{res.name}</p>
-                          <p className="text-[10px] text-slate-500">{res.desc}</p>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-slate-400 group-hover/item:text-indigo-500" />
-                      </a>
-                    ))}
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card className="border-none shadow-sm bg-slate-900 text-white overflow-hidden relative">
-                <div className="absolute -right-12 -bottom-12 opacity-10">
-                  <Users className="w-64 h-64" />
-                </div>
-                <CardHeader>
-                  <CardTitle>Community Support</CardTitle>
-                  <CardDescription className="text-slate-400">You are not alone. There are millions of people and organizations ready to help.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-                    If you're feeling overwhelmed, remember that reaching out is a sign of strength. Whether it's a friend, a teacher, or one of the professional services listed above, talking about your experiences is the first step toward resolution and healing.
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
           {activeTab === "chat" && (
             <motion.div
               key="chat"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
               className="max-w-4xl mx-auto h-[calc(100vh-12rem)] flex flex-col"
             >
               <Card className="flex-1 flex flex-col border-none shadow-xl overflow-hidden">
@@ -1060,9 +818,9 @@ export default function App() {
           {activeTab === "emergency" && (
             <motion.div
               key="emergency"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
               className="max-w-4xl mx-auto space-y-8"
             >
               <div className="text-center space-y-2">
